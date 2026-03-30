@@ -346,13 +346,13 @@ async function runScreener() {
     Object.keys(sectorPETable).forEach(k => delete sectorPETable[k]);
 
     function lastTradingDay() {
-      const d = new Date();
-      const day = d.getDay();
-      if (day === 0) d.setDate(d.getDate() - 2);
-      else if (day === 6) d.setDate(d.getDate() - 1);
-      else d.setDate(d.getDate() - 1);
-      return d.toISOString().split('T')[0];
-    }
+  const d = new Date();
+  d.setDate(d.getDate() - 4);
+  const day = d.getDay();
+  if (day === 0) d.setDate(d.getDate() - 2);
+  else if (day === 6) d.setDate(d.getDate() - 1);
+  return d.toISOString().split('T')[0];
+}
     const snapshotDate = lastTradingDay();
     const cacheKey = `fmp_industry_pe_${snapshotDate}`;
 
