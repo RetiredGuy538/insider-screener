@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Insider Buy + Value Screener</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --surface2: #1c2330; --border: #2a3441;
+    --accent: #58a6ff; --accent2: #3fb950; --warn: #f0883e; --danger: #f85149;
+    --muted: #8b949e; --text: #e6edf3; --text2: #c9d1d9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+  header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 18px 28px; display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo { font-family: 'DM Serif Display', serif; font-size: 1.3rem; display: flex; align-items: center; gap: 10px; }
+  .pulse { width: 9px; height: 9px; background: var(--accent2); border-radius: 50%; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
+  .run-btn {
+    background: var(--accent); color: #0d1117; border: none; padding: 9px 22px; border-radius: 6px;
+    font-family: 'DM Sans',sans-serif; font-weight: 600; font-size: .88rem;
+    cursor: pointer; transition: opacity .2s, transform .15s;
+  }
+  .run-btn:hover { opacity: .85; transform: translateY(-1px); }
+  .run-btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+  .controls {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 14px 28px; display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-end;
+  }
+  .ctrl { display: flex; flex-direction: column; gap: 4px; }
+  .ctrl label { font-size: .7rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .ctrl select {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    padding: 7px 11px; border-radius: 5px; font-family: 'DM Sans',sans-serif; font-size: .86rem;
+    outline: none; min-width: 155px;
+  }
+  .ctrl select:focus { border-color: var(--accent); }
+  main { padding: 24px 28px; max-width: 1450px; margin: 0 auto; }
+  .status-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; font-size: .83rem; color: var(--muted); min-height: 26px; }
+  .spinner { width: 15px; height: 15px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; display: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .notice { padding: 11px 15px; border-radius: 6px; font-size: .84rem; margin-bottom: 12px; display: none; line-height: 1.5; }
+  .notice.err  { background: rgba(248,81,73,.1);  border: 1px solid rgba(248,81,73,.3);  color: var(--danger); }
+  .notice.info { background: rgba(88,166,255,.08); border: 1px solid rgba(88,166,255,.25); color: var(--accent); }
+  .notice.warn { background: rgba(240,136,62,.1);  border: 1px solid rgba(240,136,62,.3);  color: var(--warn); }
+  .prog-wrap { width: 100%; height: 3px; background: var(--border); border-radius: 2px; margin-bottom: 18px; display: none; overflow: hidden; }
+  .prog-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width .4s; }
+  .stats-row { display: none; grid-template-columns: repeat(auto-fit,minmax(155px,1fr)); gap: 12px; margin-bottom: 20px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+  .stat .val { font-family: 'DM Serif Display',serif; font-size: 1.6rem; line-height: 1; }
+  .stat .lbl { font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-top: 5px; }
+  table { width: 100%; border-collapse: collapse; font-size: .86rem; }
+  thead th {
+    background: var(--surface); padding: 10px 13px; text-align: left; font-size: .69rem;
+    font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--muted);
+    border-bottom: 1px solid var(--border); cursor: pointer; white-space: nowrap; user-select: none;
+  }
+  thead th:hover { color: var(--text); }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+  tbody tr:hover { background: var(--surface2); }
+  tbody td { padding: 10px 13px; color: var(--text2); vertical-align: middle; }
+  .ticker { font-family: 'DM Mono',monospace; font-size: .8rem; font-weight: 500; color: var(--accent); }
+  .co-name { font-weight: 500; color: var(--text); max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pill { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: .7rem; font-weight: 600; font-family: 'DM Mono',monospace; }
+  .g { background: rgba(63,185,80,.15); color: var(--accent2); }
+  .b { background: rgba(88,166,255,.15); color: var(--accent); }
+  .sector-tag { font-size: .69rem; padding: 2px 6px; border-radius: 3px; background: var(--surface2); border: 1px solid var(--border); white-space: nowrap; }
+  .pe-wrap { display: flex; align-items: center; gap: 7px; }
+  .pe-bar { height: 5px; border-radius: 3px; background: var(--border); flex: 1; min-width: 50px; overflow: hidden; }
+  .pe-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg,var(--accent2),var(--accent)); }
+  .pe-fill.hi { background: linear-gradient(90deg,var(--accent),var(--warn)); }
+  .mono { font-family: 'DM Mono',monospace; font-size: .79rem; }
+  .ins-amt { font-family: 'DM Mono',monospace; font-size: .81rem; color: var(--accent2); font-weight: 500; }
+  .ins-sub { font-size: .69rem; color: var(--muted); margin-top: 2px; }
+  .sort-arr { margin-left: 3px; opacity: .35; }
+  .sort-arr.on { opacity: 1; color: var(--accent); }
+  .empty { text-align: center; padding: 70px 20px; color: var(--muted); }
+  .empty .big { font-family: 'DM Serif Display',serif; font-size: 2rem; margin-bottom: 8px; }
+  .legend { font-size: .74rem; color: var(--muted); margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); line-height: 1.7; }
+
+  /* ── Password gate ── */
+  #gate {
+    position: fixed; inset: 0; z-index: 9999;
+    background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .gate-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 40px 44px;
+    width: 100%; max-width: 380px;
+    text-align: center;
+  }
+  .gate-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.5rem;
+    margin-bottom: 6px;
+  }
+  .gate-sub {
+    font-size: .82rem;
+    color: var(--muted);
+    margin-bottom: 28px;
+    line-height: 1.5;
+  }
+  .gate-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 11px 14px;
+    border-radius: 6px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .95rem;
+    outline: none;
+    margin-bottom: 14px;
+    text-align: center;
+    letter-spacing: .15em;
+  }
+  .gate-input:focus { border-color: var(--accent); }
+  .gate-btn {
+    width: 100%;
+    background: var(--accent); color: #0d1117;
+    border: none; padding: 11px;
+    border-radius: 6px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 600; font-size: .92rem;
+    cursor: pointer;
+    transition: opacity .2s;
+  }
+  .gate-btn:hover { opacity: .85; }
+  .gate-err {
+    color: var(--danger);
+    font-size: .8rem;
+    margin-top: 10px;
+    min-height: 18px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Password gate — shown until correct password entered ── -->
+<div id="gate">
+  <div class="gate-card">
+    <div class="gate-title">📊 Insider Screener</div>
+    <div class="gate-sub">Enter the access password to continue.</div>
+    <input id="gateInput" class="gate-input" type="password"
+      placeholder="••••••••"
+      onkeydown="if(event.key==='Enter') checkPassword()"
+      autocomplete="current-password" />
+    <button class="gate-btn" onclick="checkPassword()">Enter</button>
+    <div class="gate-err" id="gateErr"></div>
+  </div>
+</div>
+
+<header>
+  <div class="logo"><span class="pulse"></span>Insider Buy &amp; Value Screener</div>
+  <button class="run-btn" id="runBtn" onclick="runScreener()">▶ Run Screen</button>
+</header>
+<div class="controls">
+  <div class="ctrl">
+    <label>Sector</label>
+    <select id="sectorFilter">
+      <option value="">All Sectors</option>
+      <option value="Technology">Technology</option>
+      <option value="Healthcare">Healthcare</option>
+      <option value="Financial Services">Financials</option>
+      <option value="Energy">Energy</option>
+      <option value="Consumer Cyclical">Consumer Cyclical</option>
+      <option value="Industrials">Industrials</option>
+      <option value="Communication Services">Communication Services</option>
+      <option value="Consumer Defensive">Consumer Defensive</option>
+      <option value="Basic Materials">Basic Materials</option>
+      <option value="Real Estate">Real Estate</option>
+      <option value="Utilities">Utilities</option>
+    </select>
+  </div>
+  <div class="ctrl">
+    <label>Min Market Cap</label>
+    <select id="capFilter">
+      <option value="300000000" selected>Small cap ($300M+)</option>
+      <option value="2000000000">Mid cap ($2B+)</option>
+      <option value="10000000000">Large cap ($10B+)</option>
+    </select>
+  </div>
+  <div class="ctrl">
+    <label>Min Insider Buy (window)</label>
+    <select id="insiderFilter">
+      <option value="10000">$10K+</option>
+      <option value="50000">$50K+</option>
+      <option value="100000" selected>$100K+</option>
+      <option value="250000">$250K+</option>
+    </select>
+  </div>
+  <div class="ctrl">
+    <label>P/E vs Industry Avg</label>
+    <select id="peFilter">
+      <option value="0.95" selected>5%+ below avg</option>
+      <option value="0.85">15%+ below avg</option>
+      <option value="0.70">30%+ below avg</option>
+    </select>
+  </div>
+  <div class="ctrl">
+    <label>Dividend Filter</label>
+    <select id="divFilter" onchange="applyDivFilter()">
+      <option value="all">All (with or without)</option>
+      <option value="any">Any dividend paid</option>
+      <option value="1">Yield &gt; 1.0%</option>
+      <option value="2">Yield &gt; 2.0%</option>
+      <option value="3">Yield &gt; 3.0%</option>
+    </select>
+  </div>
+  <div class="ctrl">
+    <label>Lookback Window</label>
+    <select id="lookbackFilter">
+      <option value="14" selected>14 days</option>
+      <option value="90">90 days</option>
+      <option value="180">180 days</option>
+    </select>
+  </div>
+</div>
+<main>
+  <div class="notice err"  id="errBox"></div>
+  <div class="notice warn" id="warnBox"></div>
+  <div class="notice info" id="infoBox"></div>
+  <div class="status-bar">
+    <div class="spinner" id="spinner"></div>
+    <span id="statusTxt">Press "Run Screen" to fetch live data.</span>
+  </div>
+  <div class="prog-wrap" id="progWrap"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+  <div class="stats-row" id="statsRow">
+    <div class="stat"><div class="val" id="sMatches">—</div><div class="lbl">Companies matched</div></div>
+    <div class="stat"><div class="val" id="sInsider">—</div><div class="lbl">Avg insider buy</div></div>
+    <div class="stat"><div class="val" id="sDiscount">—</div><div class="lbl">Avg P/E discount</div></div>
+    <div class="stat"><div class="val" id="sSectors">—</div><div class="lbl">Sectors</div></div>
+  </div>
+  <div id="tableWrap">
+    <div class="empty"><div class="big">📊</div><div>Configure filters above and hit Run Screen</div></div>
+  </div>
+  <div class="legend" id="legend" style="display:none">
+    <strong>Method:</strong>
+    (1) Industry P/E benchmarks loaded from FMP Industry P/E Snapshot (most recent trading day) — one consistent value per industry for the entire screen.
+    (2) Stock screener pulls US equities matching your market cap &amp; sector filters.
+    (3) Insider purchase feed scanned for officer/director open-market cash purchases within lookback window (Form 4 transaction type P only — option exercises, awards, and grants excluded).
+    (4) P/E fetched via key-metrics-ttm (1 ÷ earningsYieldTTM); P/B via ratios-ttm; ROE via key-metrics-ttm. P/B and ROE industry means derived from peer stocks in the same industry within screener results (requires ≥2 peers). ROE color: green=healthy (5–40%), orange=unusually high (>40%), red=negative.
+    Rows highlighted green passed the P/E threshold vs their industry average. P/B green = below peer mean, blue = above. Data: Financial Modeling Prep. Not financial advice.
+  </div>
+</main>
+
+<script>
+// ── Password gate ────────────────────────────────────────────────────────────
+const SCREENER_PASSWORD = 'lakelife';
+
+(function() {
+  const stored = sessionStorage.getItem('screener_auth');
+  if (stored === SCREENER_PASSWORD) {
+    document.getElementById('gate').style.display = 'none';
+  }
+})();
+
+function checkPassword() {
+  const val = document.getElementById('gateInput').value;
+  if (val === SCREENER_PASSWORD) {
+    sessionStorage.setItem('screener_auth', SCREENER_PASSWORD);
+    document.getElementById('gate').style.display = 'none';
+    document.getElementById('gateInput').value = '';
+  } else {
+    const err = document.getElementById('gateErr');
+    err.textContent = 'Incorrect password. Try again.';
+    document.getElementById('gateInput').value = '';
+    document.getElementById('gateInput').focus();
+    setTimeout(() => { err.textContent = ''; }, 3000);
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
+const API  = 'lKS2Lk2GdsxkJYkl4zKWMiAAIMkIzDOI';
+const BASE = 'https://financialmodelingprep.com/stable';
+
+let sortCol = 'insiderTotal', sortDir = -1, lastResults = [], allResults = [];
+let industryPETable = {};
+let sectorPETable   = {};
+let industryPBTable = {};  // peer-derived P/B means, built after P/E fetch
+let industryROETable = {}; // peer-derived ROE means
+const $ = id => document.getElementById(id);
+
+function setStatus(msg, spin=false) {
+  $('statusTxt').textContent = msg;
+  $('spinner').style.display = spin ? 'inline-block' : 'none';
+}
+function setProgress(pct) {
+  $('progWrap').style.display = 'block';
+  $('progFill').style.width = Math.min(pct,100)+'%';
+  if (pct >= 100) setTimeout(()=>{ $('progWrap').style.display='none'; }, 700);
+}
+function notice(type, msg) {
+  const el = $(type+'Box');
+  el.innerHTML = msg;
+  el.style.display = msg ? 'block' : 'none';
+}
+function clearNotices() { ['err','warn','info'].forEach(t=>notice(t,'')); }
+function today() { return new Date().toISOString().split('T')[0]; }
+function daysAgo(n) { const d=new Date(); d.setDate(d.getDate()-n); return d.toISOString().split('T')[0]; }
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function fmpGet(path, params={}) {
+  const url = new URL(BASE + path);
+  url.searchParams.set('apikey', API);
+  for (const [k,v] of Object.entries(params))
+    if (v!==''&&v!==null&&v!==undefined) url.searchParams.set(k, String(v));
+  const r = await fetch(url.toString());
+  if (r.status===401||r.status===403) throw new Error('AUTH_'+r.status);
+  if (!r.ok) throw new Error('HTTP_'+r.status);
+  const d = await r.json();
+  if (d&&d['Error Message']) throw new Error(d['Error Message']);
+  if (d&&d.message&&!Array.isArray(d)) throw new Error(d.message);
+  return d;
+}
+
+async function runScreener() {
+  clearNotices();
+  $('statsRow').style.display = 'none';
+  $('legend').style.display = 'none';
+  $('tableWrap').innerHTML = '<div class="empty"><div class="big">⏳</div><div>Loading…</div></div>';
+  $('runBtn').disabled = true;
+  setProgress(5);
+
+  const sector     = $('sectorFilter').value;
+  const minCap     = parseInt($('capFilter').value);
+  const minInsider = parseInt($('insiderFilter').value);
+  const peThresh   = parseFloat($('peFilter').value);
+  const lookback   = parseInt($('lookbackFilter').value);
+  const fromDate   = daysAgo(lookback);
+  const todayStr   = today();
+
+  try {
+
+    // ══ Industry P/E table — fetch once, cache in sessionStorage ════════════
+    setStatus('Step 1/3 — Loading industry P/E benchmarks…', true);
+    Object.keys(industryPETable).forEach(k => delete industryPETable[k]);
+    Object.keys(sectorPETable).forEach(k => delete sectorPETable[k]);
+
+    function lastTradingDay() {
+      const d = new Date();
+      d.setDate(d.getDate() - 4);
+      const day = d.getDay();
+      if (day === 0) d.setDate(d.getDate() - 2);
+      else if (day === 6) d.setDate(d.getDate() - 1);
+      return d.toISOString().split('T')[0];
+    }
+    const snapshotDate = lastTradingDay();
+    const cacheKey = `fmp_industry_pe_${snapshotDate}`;
+
+    for (const k of Object.keys(sessionStorage)) {
+      if (k.startsWith('fmp_industry_pe_') && k !== cacheKey) sessionStorage.removeItem(k);
+    }
+    let snapshotLoaded = false;
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        Object.assign(industryPETable, parsed);
+        snapshotLoaded = Object.keys(industryPETable).length > 0;
+        if (snapshotLoaded) setStatus(`Step 1/3 — Industry P/E loaded from cache (${snapshotDate}).`, false);
+      } catch(_) {}
+    }
+
+    if (!snapshotLoaded) {
+      try {
+        const tmp = {};
+        for (const exch of ['NYSE', 'NASDAQ']) {
+          const data = await fmpGet('/industry-pe-snapshot', { date: snapshotDate, exchange: exch });
+          if (!Array.isArray(data)) continue;
+          for (const row of data) {
+            const ind = row.industry || row.industryName || row.name;
+            const pe  = parseFloat(row.pe ?? row.peRatio ?? row.priceEarningsRatio ?? null);
+            if (!ind || !(pe > 0) || pe > 500) continue;
+            if (!tmp[ind]) tmp[ind] = [];
+            tmp[ind].push(pe);
+          }
+          await sleep(200);
+        }
+        for (const [ind, vals] of Object.entries(tmp)) {
+          industryPETable[ind] = vals.reduce((a,b)=>a+b,0) / vals.length;
+        }
+        if (Object.keys(industryPETable).length > 0) {
+          snapshotLoaded = true;
+          sessionStorage.setItem(cacheKey, JSON.stringify(industryPETable));
+          setStatus(`Step 1/3 — Loaded P/E for ${Object.keys(industryPETable).length} industries (${snapshotDate}).`, false);
+          console.log('Snapshot industry names:', Object.keys(industryPETable).sort().join(', '));
+        } else {
+          throw new Error('no valid PE values in response');
+        }
+      } catch(e) {
+        notice('warn', `Industry P/E snapshot unavailable (${e.message}) — using sector-level fallback.`);
+      }
+    }
+
+    if (!snapshotLoaded) {
+      try {
+        for (const exch of ['NYSE', 'NASDAQ']) {
+          const data = await fmpGet('/sector-pe-snapshot', { date: snapshotDate, exchange: exch });
+          if (!Array.isArray(data)) continue;
+          for (const row of data) {
+            const sec = row.sector;
+            const pe  = parseFloat(row.pe ?? row.peRatio ?? null);
+            if (!sec || !(pe > 0) || pe > 500) continue;
+            if (!sectorPETable[sec]) sectorPETable[sec] = [];
+            sectorPETable[sec].push(pe);
+          }
+          await sleep(200);
+        }
+        for (const [sec, vals] of Object.entries(sectorPETable)) {
+          sectorPETable[sec] = vals.reduce((a,b)=>a+b,0) / vals.length;
+        }
+      } catch(_) {}
+    }
+
+    setProgress(15);
+
+    // ══ STEP 1: Stock Screener — run per-sector for full coverage ════════
+    setStatus('Step 1/3 — Running stock screener…', true);
+    const ALL_SECTORS = [
+      'Technology','Healthcare','Financial Services','Energy',
+      'Consumer Cyclical','Industrials','Communication Services',
+      'Consumer Defensive','Basic Materials','Real Estate','Utilities'
+    ];
+    const sectorsToFetch = sector ? [sector] : ALL_SECTORS;
+
+    const screenerMap = {};
+    let sectorsDone = 0;
+    for (const sec of sectorsToFetch) {
+      try {
+        const data = await fmpGet('/company-screener', {
+          marketCapMoreThan: minCap,
+          isActivelyTrading: true,
+          exchange: 'NYSE,NASDAQ,AMEX',
+          country: 'US',
+          sector: sec,
+          limit: 500
+        });
+        if (Array.isArray(data)) {
+          for (const s of data) {
+            if (!s.isEtf && !s.isFund && s.symbol) {
+              screenerMap[s.symbol] = {
+                name:     s.companyName || s.symbol,
+                sector:   s.sector   || '—',
+                industry: s.industry || '—',
+                mktCap:   parseFloat(s.marketCap || 0),
+                price:    parseFloat(s.price || 0),
+                dividend: parseFloat(s.lastAnnualDividend || 0)
+              };
+            }
+          }
+        }
+      } catch(_) {}
+      sectorsDone++;
+      setProgress(15 + Math.round((sectorsDone / sectorsToFetch.length) * 18));
+      setStatus(`Step 2/3 — Screener: ${sectorsDone}/${sectorsToFetch.length} sectors (${Object.keys(screenerMap).length} stocks so far)…`, true);
+      if (sectorsDone < sectorsToFetch.length) await sleep(150);
+    }
+
+    const screenerSymbols = new Set(Object.keys(screenerMap));
+    if (screenerSymbols.size === 0) {
+      throw new Error('Screener returned no stocks. Try relaxing market cap or sector filter.');
+    }
+    setStatus(`Step 1/3 — Screener complete: ${screenerSymbols.size} qualifying stocks.`, false);
+    setProgress(33);
+
+    // ══ STEP 2: Insider purchase feed ════════════════════════════════════
+    setStatus('Step 2/3 — Fetching insider purchase filings…', true);
+    const insiderMap = {};
+    let page = 0;
+    let totalScanned = 0;
+    let consecutiveEmpty = 0;
+    const MAX_PAGES = 40;
+
+    while (page < MAX_PAGES && consecutiveEmpty < 2) {
+      let trades = null;
+      for (const endpoint of [
+        ['/insider-trading/search', { transactionType: 'P-Purchase', page, limit: 100 }],
+        ['/insider-trading/latest', { page, limit: 100 }]
+      ]) {
+        try {
+          trades = await fmpGet(endpoint[0], endpoint[1]);
+          if (Array.isArray(trades)) break;
+        } catch(_) {}
+      }
+
+      if (!Array.isArray(trades) || trades.length === 0) {
+        consecutiveEmpty++;
+        page++;
+        continue;
+      }
+      consecutiveEmpty = 0;
+
+      for (const t of trades) {
+        totalScanned++;
+        const d = t.transactionDate || t.filingDate || t.date;
+        if (!d || d < fromDate || d > todayStr) continue;
+
+        // ── Only count true open-market cash purchases (Form 4 type "P") ──
+        // Excludes: M (option exercise), A (grant/award), C (conversion),
+        //           G (gift), F (tax withholding), and all other non-cash types.
+        const tt = String(t.transactionType || '').toUpperCase().trim();
+        const isBuy = (tt === 'P' || tt === 'P-PURCHASE');
+        if (!isBuy) continue;
+
+        const own = String(t.typeOfOwner || t.ownerType || '').toLowerCase();
+        if (own.includes('10%') || own.includes('beneficial owner only')) continue;
+
+        const sym = t.symbol || t.ticker;
+        if (!sym) continue;
+
+        if (!screenerSymbols.has(sym)) continue;
+
+        const shares = Math.abs(parseFloat(t.securitiesTransacted || t.shares || 0));
+        const price  = parseFloat(t.price || t.transactionPrice || 0);
+        const val    = shares * price;
+
+        if (!insiderMap[sym]) insiderMap[sym] = { totalVal: 0, count: 0, buyers: new Map(), dates: new Set() };
+        insiderMap[sym].totalVal += val;
+        insiderMap[sym].count++;
+        if (d) insiderMap[sym].dates.add(d);
+        const buyer = t.reportingName || t.filerName || t.insiderName;
+        const title = t.officerTitle || t.position || t.reportingTitle || t.typeOfOwner || '';
+        if (buyer) insiderMap[sym].buyers.set(buyer, title);
+      }
+
+      page++;
+      setProgress(33 + Math.round((page/MAX_PAGES)*25));
+      setStatus(`Step 2/3 — Scanned ${totalScanned} filings (page ${page})…`, true);
+    }
+
+    // Apply minimum dollar threshold
+    const qualifiedSymbols = Object.entries(insiderMap)
+      .filter(([,v]) => v.totalVal >= minInsider)
+      .map(([sym, v]) => ({
+        symbol:       sym,
+        insiderTotal: v.totalVal,
+        insiderCount: v.count,
+        buyers:       [...v.buyers.entries()].slice(0,3).map(([name,title]) => ({name, title})),
+        dates:        [...v.dates].sort().reverse().slice(0,4),
+        ...screenerMap[sym]
+      }));
+
+    if (qualifiedSymbols.length === 0) {
+      setStatus('No qualifying insider purchases found.', false);
+      $('tableWrap').innerHTML = `<div class="empty"><div class="big">🔍</div><div>
+        No officer/director open-market cash purchases ≥ $${(minInsider/1000).toFixed(0)}K found in the last ${lookback} days
+        among the ${screenerSymbols.size} stocks passing your cap/sector filters.<br><br>
+        Try: lower the insider minimum, widen the lookback, or pick "All Sectors".
+      </div></div>`;
+      $('runBtn').disabled = false;
+      setProgress(100);
+      return;
+    }
+
+    // ══ STEP 3: Fetch P/E for qualified stocks + build peer medians ═══════
+    setStatus(`Step 3/3 — Fetching P/E for ${qualifiedSymbols.length} candidates…`, true);
+    setProgress(60);
+
+    const BATCH = 1;  // sequential — one stock at a time to avoid 429s
+    let done = 0;
+    let firstSuccessLogged = false;
+    const peErrors = [];
+
+    async function fetchMetrics(symbol) {
+      // Fetch ratios-ttm (PE + P/B) and key-metrics-ttm (ROE) in parallel
+      // Two calls per stock, fired together, with the sequential loop providing rate control
+      let pe = null, pb = null, roe = null;
+
+      try {
+        const [ratiosData, metricsData] = await Promise.all([
+          fmpGet('/ratios-ttm',      { symbol }),
+          fmpGet('/key-metrics-ttm', { symbol })
+        ]);
+
+        // Parse ratios-ttm for PE and P/B
+        const rat = Array.isArray(ratiosData)  ? ratiosData[0]  : ratiosData;
+        if (rat && typeof rat === 'object') {
+          // PE
+          const peVal = parseFloat(rat.priceToEarningsRatioTTM ?? rat.priceEarningsRatioTTM ?? rat.peRatioTTM ?? null);
+          if (peVal > 0 && peVal < 800) pe = peVal;
+          // P/B
+          const pbVal = parseFloat(rat.priceToBookRatioTTM ?? rat.pbRatioTTM ?? null);
+          if (pbVal > 0 && pbVal < 200) pb = pbVal;
+        }
+
+        // Parse key-metrics-ttm for ROE (and PE fallback via earningsYield)
+        const met = Array.isArray(metricsData) ? metricsData[0] : metricsData;
+        if (met && typeof met === 'object') {
+          // ROE
+          const roeVal = parseFloat(met.returnOnEquityTTM ?? null);
+          if (!isNaN(roeVal)) roe = roeVal;
+          // PE fallback via earnings yield if not found in ratios
+          if (pe === null) {
+            const ey = parseFloat(met.earningsYieldTTM ?? null);
+            if (ey > 0 && ey <= 1) {
+              const impliedPE = 1 / ey;
+              if (impliedPE > 0 && impliedPE < 800) pe = impliedPE;
+            }
+          }
+        }
+      } catch(e) {
+        peErrors.push(`${symbol}: ${e.message}`);
+      }
+
+      return { pe, pb, roe };
+    }
+
+    for (let i = 0; i < qualifiedSymbols.length; i++) {
+      const cand = qualifiedSymbols[i];
+      const metrics = await fetchMetrics(cand.symbol);
+      cand.pe  = metrics ? metrics.pe  : null;
+      cand.pb  = metrics ? metrics.pb  : null;
+      cand.roe = metrics ? metrics.roe : null;
+      done++;
+      setProgress(60 + Math.round((done / qualifiedSymbols.length) * 30));
+      setStatus(`Step 3/3 — Fetching metrics ${done}/${qualifiedSymbols.length} (${cand.symbol})…`, true);
+      if (done < qualifiedSymbols.length) await sleep(350); // 350ms between stocks ~ 3 req/sec
+    }
+
+    // ══ Apply P/E benchmark + filter ═════════════════════════════════════
+    setStatus('Applying P/E benchmark and filtering…', true);
+    setProgress(93);
+
+    const results = [];
+    for (const s of qualifiedSymbols) {
+      const bench = getBenchmarkPE(s.industry, s.sector);
+      const hasPE = s.pe !== null && bench && bench >= 1;
+      const passedPE = hasPE && s.pe <= bench * peThresh;
+
+      results.push({
+        ...s,
+        peerAvg:        hasPE ? bench : null,
+        peDiscount:     hasPE ? ((s.pe / bench) - 1) * 100 : null,
+        passedPEFilter: passedPE
+      });
+    }
+
+    // ══ Build peer P/B and ROE industry means from screener results ══════
+    Object.keys(industryPBTable).forEach(k => delete industryPBTable[k]);
+    Object.keys(industryROETable).forEach(k => delete industryROETable[k]);
+    const pbByIndustry  = {};
+    const roeByIndustry = {};
+    for (const s of results) {
+      if (s.industry && s.industry !== '—') {
+        if (s.pb !== null && s.pb > 0) {
+          if (!pbByIndustry[s.industry]) pbByIndustry[s.industry] = [];
+          pbByIndustry[s.industry].push(s.pb);
+        }
+        if (s.roe !== null && s.roe !== undefined) {
+          if (!roeByIndustry[s.industry]) roeByIndustry[s.industry] = [];
+          roeByIndustry[s.industry].push(s.roe);
+        }
+      }
+    }
+    for (const [ind, vals] of Object.entries(pbByIndustry)) {
+      if (vals.length >= 2) industryPBTable[ind] = vals.reduce((a,b)=>a+b,0) / vals.length;
+    }
+    for (const [ind, vals] of Object.entries(roeByIndustry)) {
+      if (vals.length >= 2) industryROETable[ind] = vals.reduce((a,b)=>a+b,0) / vals.length;
+    }
+    for (const s of results) {
+      const pbBench  = industryPBTable[s.industry]  || null;
+      const roeBench = industryROETable[s.industry] || null;
+      const hasPB    = s.pb  !== null && s.pb > 0 && pbBench !== null;
+      const hasROE   = s.roe !== null && s.roe !== undefined && roeBench !== null;
+      s.pbPeerAvg    = hasPB  ? pbBench  : null;
+      s.pbDiscount   = hasPB  ? ((s.pb  / pbBench)  - 1) * 100 : null;
+      s.roePeerAvg   = hasROE ? roeBench : null;
+      s.roeVsPeers   = hasROE ? ((s.roe / roeBench) - 1) * 100 : null;
+    }
+
+    results.sort((a,b) => {
+      if (a.passedPEFilter !== b.passedPEFilter) return a.passedPEFilter ? -1 : 1;
+      return b.insiderTotal - a.insiderTotal;
+    });
+
+    notice('err','');
+    notice('warn','');
+
+    const pePassCount = results.filter(r=>r.passedPEFilter).length;
+    if (pePassCount === 0 && results.length > 0) {
+      notice('info', `ℹ️ ${results.length} stocks have qualifying insider buying but none currently trade below the P/E threshold. All are shown below — try loosening the P/E setting, or rows with N/A P/E have no earnings data.`);
+    }
+
+    allResults = results;
+    applyDivFilter();
+
+    if (allResults.length) {
+      $('sMatches').textContent = lastResults.length;
+      $('sInsider').textContent = '$'+fmt(lastResults.reduce((s,r)=>s+r.insiderTotal,0)/Math.max(lastResults.length,1));
+      const wp = lastResults.filter(r=>r.peDiscount!==null);
+      $('sDiscount').textContent = wp.length ? (wp.reduce((s,r)=>s+r.peDiscount,0)/wp.length).toFixed(1)+'%' : '—';
+      $('sSectors').textContent  = new Set(lastResults.map(r=>r.sector)).size;
+      $('statsRow').style.display = 'grid';
+      $('legend').style.display = 'block';
+    }
+
+    setProgress(100);
+    const divNote = $('divFilter').value !== 'all' ? `, dividend filter applied (${lastResults.length} of ${allResults.length} shown)` : '';
+    setStatus(
+      `✓ Done — ${allResults.length} stocks with qualifying insider buying${pePassCount ? `, ${pePassCount} also below P/E threshold` : ''}${divNote} (${screenerSymbols.size} screened across ${sectorsToFetch.length} sector${sectorsToFetch.length>1?'s':''}, ${totalScanned} filings scanned).`,
+      false
+    );
+
+  } catch(e) {
+    setStatus('Error — see message above.', false);
+    notice('err', '⚠️ '+e.message);
+    setProgress(100);
+  }
+  $('runBtn').disabled = false;
+}
+
+function applyDivFilter() {
+  if (!allResults.length) return;
+  const divFilter = $('divFilter').value;
+  lastResults = allResults.filter(r => {
+    if (divFilter === 'all') return true;
+    const div = r.dividend || 0;
+    const yld = (r.price > 0 && div > 0) ? (div / r.price * 100) : 0;
+    if (divFilter === 'any') return div > 0;
+    return yld > parseFloat(divFilter);
+  });
+  renderTable(lastResults);
+  if ($('statsRow').style.display !== 'none') {
+    $('sMatches').textContent = lastResults.length;
+    $('sInsider').textContent = '$'+fmt(lastResults.reduce((s,r)=>s+r.insiderTotal,0)/Math.max(lastResults.length,1));
+    const wp = lastResults.filter(r=>r.peDiscount!==null);
+    $('sDiscount').textContent = wp.length ? (wp.reduce((s,r)=>s+r.peDiscount,0)/wp.length).toFixed(1)+'%' : '—';
+    $('sSectors').textContent  = new Set(lastResults.map(r=>r.sector)).size;
+    const divNote = divFilter !== 'all' ? ` (${lastResults.length} of ${allResults.length} shown with dividend filter)` : '';
+    const cur = $('statusTxt').textContent;
+    const base = cur.replace(/ \(\d+ of \d+ shown with dividend filter\)/, '');
+    $('statusTxt').textContent = base.replace(/\.$/, '') + divNote + '.';
+  }
+}
+
+function fuzzyFind(map, key) {
+  if (!key||key==='—') return null;
+  const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g,'');
+  const t = norm(key), keys = Object.keys(map);
+  const exact = keys.find(k=>norm(k)===t);
+  if (exact) return map[exact];
+  const partial = keys.find(k=>{ const n=norm(k); return n.includes(t)||t.includes(n); });
+  if (partial) return map[partial];
+  const words = t.split(/\s+/).filter(w=>w.length>3);
+  const overlap = keys.find(k=>{
+    const kw = norm(k).split(/\s+/);
+    return words.filter(w=>kw.some(kk=>kk.includes(w)||w.includes(kk))).length >= 2;
+  });
+  return overlap ? map[overlap] : null;
+}
+
+const INDUSTRY_MAP = {
+  'Medical - Care Facilities':            'Medical Care Facilities',
+  'Medical - Devices':                    'Medical Devices',
+  'Medical - Diagnostics & Research':     'Diagnostics & Research',
+  'Medical - Distribution':              'Medical Distribution',
+  'Medical - Healthcare Plans':           'Healthcare Plans',
+  'Medical - Instruments & Supplies':    'Medical Instruments & Supplies',
+  'Medical - Pharmaceuticals':           'Pharmaceuticals',
+  'Drug Manufacturers - General':        'Drug Manufacturers—General',
+  'Drug Manufacturers - Specialty & Generic': 'Drug Manufacturers—Specialty & Generic',
+  'Biotechnology':                        'Biotechnology',
+  'Health Information Services':         'Health Information Services',
+};
+
+function getBenchmarkPE(industry, sec) {
+  if (industryPETable[industry]) return industryPETable[industry];
+  const mapped = INDUSTRY_MAP[industry];
+  if (mapped && industryPETable[mapped]) return industryPETable[mapped];
+  const fuzzyInd = fuzzyFind(industryPETable, industry);
+  if (fuzzyInd) return fuzzyInd;
+  if (sectorPETable[sec]) return sectorPETable[sec];
+  return null;
+}
+
+function fmtROE(roe) {
+  if (roe === null || roe === undefined) return '<span style="color:var(--muted);font-size:.75rem">N/A</span>';
+  const pct = (roe * 100).toFixed(1);
+  // Color coding: negative=red, 0-5%=muted, 5-40%=green, >40%=warn (unusually high)
+  let color, title;
+  if (roe < 0)       { color = 'var(--danger)'; title = 'Negative ROE'; }
+  else if (roe < 0.05) { color = 'var(--muted)';  title = 'Low ROE'; }
+  else if (roe <= 0.40){ color = 'var(--accent2)'; title = 'Healthy ROE'; }
+  else                 { color = 'var(--warn)';    title = 'Unusually high ROE (leverage or sector effect)'; }
+  return '<span class="mono" style="color:' + color + '" title="' + title + '">' + pct + '%</span>';
+}
+function fmtROEVsPeers(roeVsPeers, roePeerAvg) {
+  if (roeVsPeers === null || roeVsPeers === undefined) return '—';
+  const sign = roeVsPeers >= 0 ? '+' : '';
+  const cls  = roeVsPeers >= 0 ? 'g' : 'b';
+  const mean = roePeerAvg !== null ? '<div style="font-size:.67rem;color:var(--muted);margin-top:2px">peer mean: ' + (roePeerAvg*100).toFixed(1) + '%</div>' : '';
+  return '<span class="pill ' + cls + '">' + sign + roeVsPeers.toFixed(1) + '%</span>' + mean;
+}
+function fmtPB(pb, pbPeerAvg) {
+  if (pb === null || pb === undefined || pb <= 0) return '<span style="color:var(--muted);font-size:.75rem">N/A</span>';
+  const pct     = pbPeerAvg ? Math.min((pb / pbPeerAvg) * 100, 100) : 0;
+  const hiClass = pct > 72 ? ' hi' : '';
+  const barHtml = pbPeerAvg !== null
+    ? '<div class="pe-bar"><div class="pe-fill' + hiClass + '" style="width:' + pct.toFixed(1) + '%"></div></div>'
+    : '';
+  const meanHtml = pbPeerAvg !== null
+    ? '<div style="font-size:.67rem;color:var(--muted);margin-top:2px">peer mean: ' + pbPeerAvg.toFixed(1) + '</div>'
+    : '';
+  return '<div class="pe-wrap">' + barHtml + '<span class="mono">' + pb.toFixed(1) + '</span></div>' + meanHtml;
+}
+function fmtPBDiscount(pbDiscount) {
+  if (pbDiscount === null || pbDiscount === undefined) return '—';
+  const sign = pbDiscount < 0 ? '' : '+';
+  const cls  = pbDiscount < 0 ? 'g' : 'b';
+  return '<span class="pill ' + cls + '">' + sign + pbDiscount.toFixed(1) + '%</span>';
+}
+function fmtDiv(div, price) {
+  if (!div || div <= 0) return '<span style="color:var(--muted);font-size:.75rem">—</span>';
+  const yld = (price > 0) ? (div / price * 100).toFixed(2) + '%' : '';
+  return `<div style="font-family:'DM Mono',monospace;font-size:.8rem">$${div.toFixed(2)}</div>
+          <div style="font-size:.67rem;color:var(--accent2)">${yld}</div>`;
+}
+function fmt(n) {
+  if (!n) return '0';
+  if (n>=1e9) return (n/1e9).toFixed(1)+'B';
+  if (n>=1e6) return (n/1e6).toFixed(1)+'M';
+  if (n>=1e3) return (n/1e3).toFixed(0)+'K';
+  return n.toFixed(0);
+}
+function fmtCap(n) {
+  if (!n) return '—';
+  if (n>=1e12) return '$'+(n/1e12).toFixed(2)+'T';
+  if (n>=1e9)  return '$'+(n/1e9).toFixed(1)+'B';
+  if (n>=1e6)  return '$'+(n/1e6).toFixed(0)+'M';
+  return '$'+n;
+}
+
+function renderTable(data) {
+  if (!data.length) {
+    $('tableWrap').innerHTML = '<div class="empty"><div class="big">🔍</div><div>No matches.</div></div>';
+    return;
+  }
+  const COLS=[
+    {k:'symbol',l:'Ticker'},{k:'name',l:'Company'},{k:'sector',l:'Sector / Industry'},
+    {k:'mktCap',l:'Mkt Cap'},{k:'pb',l:'P/B'},{k:'pbDiscount',l:'P/B vs Peers'},{k:'roe',l:'ROE'},{k:'roeVsPeers',l:'ROE vs Peers'},{k:'dividend',l:'Dividend'},
+    {k:'pe',l:'P/E'},{k:'peDiscount',l:'vs Industry'},
+    {k:'insiderTotal',l:'Insider Buy $'},{k:'insiderCount',l:'Trades'}
+  ];
+  let h='<table><thead><tr>';
+  for (const c of COLS) {
+    const arr=c.k===sortCol?(sortDir===1?'↑':'↓'):'↕';
+    const on=c.k===sortCol?' on':'';
+    h+=`<th onclick="sortBy('${c.k}')">${c.l} <span class="sort-arr${on}">${arr}</span></th>`;
+  }
+  h+='<th>Recent Buyers &amp; Titles</th><th>Transaction Dates</th></tr></thead><tbody>';
+  for (const r of data) {
+    const hasPE = r.pe!==null&&r.pe!==undefined&&r.peerAvg&&r.peDiscount!==null;
+    const pct   = hasPE ? Math.min((r.pe/r.peerAvg)*100,100) : 0;
+    const sign  = r.peDiscount<0 ? '' : '+';
+    const rowBg = r.passedPEFilter ? 'style="background:rgba(63,185,80,.05)"' : '';
+    const datesHtml = (r.dates||[]).map(d => `<span style="font-family:'DM Mono',monospace;font-size:.71rem;white-space:nowrap">${d}</span>`).join('<br>');
+    const buyersHtml = (r.buyers||[]).map(b => {
+      const titleStr = b.title ? `<span style="color:var(--muted);font-size:.67rem;display:block">${b.title}</span>` : '';
+      return `<span style="font-size:.73rem">${b.name}</span>${titleStr}`;
+    }).join('<div style="margin-top:4px">');
+    h+=`<tr ${rowBg}>
+      <td><span class="ticker">${r.symbol}</span></td>
+      <td><div class="co-name" title="${r.name}">${r.name}</div></td>
+      <td>
+        <span class="sector-tag">${r.sector}</span>
+        <div style="font-size:.67rem;color:var(--muted);margin-top:3px;line-height:1.3">${r.industry !== '—' ? r.industry : ''}</div>
+      </td>
+      <td class="mono">${fmtCap(r.mktCap)}</td>
+      <td>${fmtPB(r.pb, r.pbPeerAvg)}</td>
+      <td>${fmtPBDiscount(r.pbDiscount)}</td>
+      <td>${fmtROE(r.roe)}</td>
+      <td>${fmtROEVsPeers(r.roeVsPeers, r.roePeerAvg)}</td>
+      <td>${fmtDiv(r.dividend, r.price)}</td>
+      <td>${hasPE?`
+        <div class="pe-wrap">
+          <div class="pe-bar"><div class="pe-fill${pct>72?' hi':''}" style="width:${pct.toFixed(1)}%"></div></div>
+          <span class="mono">${r.pe.toFixed(1)}</span>
+        </div>
+        <div style="font-size:.67rem;color:var(--muted);margin-top:2px">ind mean: ${r.peerAvg.toFixed(1)}</div>
+      `:'<span style="font-size:.75rem;color:var(--muted)">N/A</span>'}</td>
+      <td>${hasPE?`<span class="pill g">${sign}${r.peDiscount.toFixed(1)}%</span>`:'—'}</td>
+      <td>
+        <div class="ins-amt">$${fmt(r.insiderTotal)}</div>
+        <div class="ins-sub">${r.insiderCount} transaction${r.insiderCount!==1?'s':''}</div>
+      </td>
+      <td><span class="pill b">${r.insiderCount}</span></td>
+      <td style="max-width:200px;line-height:1.4;vertical-align:top;padding-top:11px">${buyersHtml || '—'}</td>
+      <td style="vertical-align:top;line-height:1.8">${datesHtml || '—'}</td>
+    </tr>`;
+  }
+  h+='</tbody></table>';
+  $('tableWrap').innerHTML=h;
+}
+
+function sortBy(col){
+  if(sortCol===col) sortDir*=-1; else{sortCol=col;sortDir=-1;}
+  renderTable(lastResults);
+}
+</script>
+</body>
+</html>
